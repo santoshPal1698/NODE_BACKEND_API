@@ -38,7 +38,7 @@ app.use(express.urlencoded({ extended: false }));
 app.use(helmet());
 app.use(
   cors({
-    origin: process.env.FRONT_END_PRODURL,
+    origin:"https://santosh-pal.netlify.app/",
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     credentials: true,
   })

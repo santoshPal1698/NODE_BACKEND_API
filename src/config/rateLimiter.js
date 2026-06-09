@@ -2,7 +2,7 @@
 const redisClient = require("../config/redis");
 // ── Configuration ────────────────────────────────────────────────────────────
 const RATE_LIMIT_CONFIG = {
-    maxRequests: 85,              // Max requests allowed per day
+    maxRequests: 100,              // Max requests allowed per day
     windowSecs: 24 * 60 * 60,   // 86400 seconds = 1 full day
     keyPrefix: "ratelimit",     // Redis key prefix for easy identification
 };

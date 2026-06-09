@@ -1,101 +1,147 @@
+// index.js
 const express = require("express");
 const session = require("express-session");
 const passport = require("passport");
 const app = express();
 const bodyParser = require("body-parser");
 require("dotenv").config();
-require("./src/db/clusterdb_server.js").connectDB();
-require("./src/Auth2Fa/Auth_Config/passportConfig.js");
-const cutomerRouter = require("./src/routes/customer_view");
-const studentRouter = require("./src/routes/student");
-const portfolioRouter = require("./src/routes/myportfolio_View");
-const GenAIRouter = require("./src/GenrativeAi-Features/Routes/ai.routes");
-const RegisterRouter = require("./src/routes/Register");
-const EmployeeRouter = require("./src/routes/employee_view");
-const aut2FaRouter = require("./src/Auth2Fa/Routes/auth2fa_view");
 const dotenvFlow = require("dotenv-flow");
 dotenvFlow.config();
-app.use(bodyParser.json());
-const port = process.env.PORT || 5000;
-const helmet = require("helmet");
+require("./src/db/clusterdb_server.js").connectDB();
+require("./src/Auth2Fa/Auth_Config/passportConfig.js");
+
+const cutomerRouter  = require("./src/routes/customer_view");
+const studentRouter  = require("./src/routes/student");
+const portfolioRouter = require("./src/routes/myportfolio_View");
+const GenAIRouter    = require("./src/GenrativeAi-Features/Routes/ai.routes");
+const RegisterRouter = require("./src/routes/Register");
+const EmployeeRouter = require("./src/routes/employee_view");
+const aut2FaRouter   = require("./src/Auth2Fa/Routes/auth2fa_view");
+
+const helmet     = require("helmet");
 const cookieParser = require("cookie-parser");
-const cors = require("cors");
-const csrf = require("csurf");
-app.use("*", cors());
-app.use(helmet());
+const cors       = require("cors");
+const csrf       = require("csurf");
 
-app.use(express.urlencoded({ extended: false }));
+// ─── Redis client (ioredis singleton) ───────────────────────────────────────
+const redisClient = require("./src/config/redis");
+const { rateLimiter, getRateLimitStatus } = require("./src/config/rateLimiter");
 
-app.use(
-  session({
-    secret: "SptechDEVE", // Use a strong and unique secret key
-    resave: false, // Don't save session if unmodified
-    saveUninitialized: false, // Don't create a session until something is stored
-    //cookie: { secure: false }  // If using HTTPS, set this to true
-  })
-);
-
-// Initialize Passport middleware (if using Passport for authentication)
-app.use(passport.initialize());
-app.use(passport.session());
-
-// app.use((req, res, next) => {
-//   res.setHeader(
-//     // "Access-Control-Allow-Origin",`${process.env.API_PROd_BASEURL}`
-//     "Access-Control-Allow-Origin",`*`
-
-//   );
-//   res.setHeader(
-//     "Access-Control-Allow-Methods",
-//     "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS,CONNECT,TRACE"
-//   );
-//   res.setHeader(
-//     "Access-Control-Allow-Headers",
-//     "Content-Type, Authorization, X-Content-Type-Options, Accept, X-Requested-With, Origin, Access-Control-Request-Method, Access-Control-Request-Headers"
-//   );
-//   res.setHeader("Access-Control-Allow-Credentials", true);
-//   res.setHeader("Access-Control-Allow-Private-Network", true);
-//   //  Firefox caps this at 24 hours (86400 seconds). Chromium (starting in v76) caps at 2 hours (7200 seconds). The default value is 5 seconds.
-//   res.setHeader("Access-Control-Max-Age", 7200);
-
-//   next();
-// });
-
-
-const csrfProtection = csrf();
+// ─── Body / cookie parsers ───────────────────────────────────────────────────
+app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.json());
-app.use(bodyParser.json());
+app.use(express.urlencoded({ extended: false }));
 
-// implemention Swagger Api Documetion
+// ─── Security ────────────────────────────────────────────────────────────────
+app.use(helmet());
+app.use(
+  cors({
+    origin: process.env.FRONT_END_PRODURL,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+    credentials: true,
+  })
+);
+
+// ─── Session + Passport ──────────────────────────────────────────────────────
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || "SptechDEVE",
+    resave: false,
+    saveUninitialized: false,
+  })
+);
+app.use(passport.initialize());
+app.use(passport.session());
+
+// ─── CSRF ────────────────────────────────────────────────────────────────────
+const csrfProtection = csrf();
+
+// ─── Swagger ─────────────────────────────────────────────────────────────────
 const swaggerUi = require("swagger-ui-express");
 const swaggerDocument = require("./swagger-output.json");
-
-
-// app.use("/api/v1/register", RegisterRouter);
-// app.use("/api/v1/auth", aut2FaRouter);
-// app.use("/api/v1/portfolio", portfolioRouter);
-// app.use("/api/v1/ai", GenAIRouter);
-// app.use("/api/v1/customer", cutomerRouter);
-// app.use("/api/v1/employee", EmployeeRouter);
-// app.use("/api/v1/student", studentRouter);
-// app.use("/api/2f-auth", aut2FaRouter);
-
-app.use("/api/v1",RegisterRouter,aut2FaRouter,portfolioRouter,GenAIRouter,cutomerRouter,EmployeeRouter,studentRouter);
-
-const swagerOptions = {
-  // explorer: false,
-  // customCss: ".swagger-ui .topbar { display: none }",
-  swaggerOptions: {
-    validatorUrl: null,
-  },
+const swaggerOptions = {
+  swaggerOptions: { validatorUrl: null },
 };
 
-app.use("/", swaggerUi.serve, swaggerUi.setup(swaggerDocument, swagerOptions));
+// ─── Redis health-check endpoint ─────────────────────────────────────────────
+// Hit GET /health to see if Redis + server are alive
+app.get("/health", async (req, res) => {
+  try {
+    const redisPing = await redisClient.ping(); // returns "PONG"
+    res.status(200).json({
+      status: "ok",
+      redis: redisPing === "PONG" ? "connected" : "unreachable",
+      uptime: `${Math.floor(process.uptime())}s`,
+    });
+  } catch (err) {
+    res.status(500).json({ status: "error", redis: "unreachable", error: err.message });
+  }
+});
+
+// ─── Cache admin endpoint (optional, protect in production) ──────────────────
+// Hit DELETE /cache/portfolio to manually flush portfolio cache keys
+app.delete("/cache/portfolio", async (req, res) => {
+  try {
+    // Find all keys matching portfolio:* pattern and delete them
+    const keys = await redisClient.keys("portfolio:*");
+    if (keys.length > 0) {
+      await redisClient.del(...keys);
+    }
+    res.status(200).json({
+      success: true,
+      message: `Flushed ${keys.length} cache key(s)`,
+      keys,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get("/api/v1/rate-limit-status", getRateLimitStatus);
+// WHY NOT apply to /health, /cache/portfolio, swagger:
+//  - /health: monitoring tools ping this every 30s — would hit limit instantly
+//  - /cache/portfolio: admin tool — should always work
+//  - swagger: documentation page — not an API call
+app.use("/api/v1", rateLimiter);
+
+// ─── App routes ──────────────────────────────────────────────────────────────
+app.use(
+  "/api/v1",
+  RegisterRouter,
+  aut2FaRouter,
+  portfolioRouter,
+  GenAIRouter,
+  cutomerRouter,
+  EmployeeRouter,
+  studentRouter
+);
+
+// ─── Swagger UI ──────────────────────────────────────────────────────────────
+app.use("/", swaggerUi.serve, swaggerUi.setup(swaggerDocument, swaggerOptions));
+
+// ─── Start server ────────────────────────────────────────────────────────────
+const port = process.env.PORT || 5000;
 
 app.listen(port, () => {
-  console.log(
-    `Your Connection  ${process.env.ENV} Server & Base Url is ${process.env.APIBASEURL} is Success & Port Number is:${port}`
-  );
+  console.log(`✅ Server running in ${process.env.ENV} mode`);
+  console.log(`🌐Api_Base URL: ${process.env.APIBASEURL} ${port}`);
+  console.log(`🚀 Port: ${port}`);
 });
+
+// ─── Graceful shutdown ───────────────────────────────────────────────────────
+// Closes Redis connection cleanly when the process is stopped (Ctrl+C or PM2 reload)
+const shutdown = async (signal) => {
+  console.log(`\n${signal} received — shutting down gracefully...`);
+  try {
+    await redisClient.quit();
+    console.log("✅ Redis disconnected");
+  } catch (err) {
+    console.error("Redis shutdown error:", err.message);
+  }
+  process.exit(0);
+};
+
+process.on("SIGINT",  () => shutdown("SIGINT"));
+process.on("SIGTERM", () => shutdown("SIGTERM"));

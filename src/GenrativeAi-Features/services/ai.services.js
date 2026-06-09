@@ -37,7 +37,7 @@ const getSystemPrompt = (resumeText) => {
   return `
 You are an AI assistant embedded in Santosh Pal's developer portfolio website.
 
-Santosh Pal is a Full Stack Developer with 4+ years of experience in:
+Santosh Pal is a Full Stack Developer With Over 5 years of experience in:
 - MongoDB, Express.js, Angular, React, Node.js, TypeScript
 - AWS Cloud, REST APIs, Microservices, Micro Frontend Architecture
 - Worked with companies like TCS (Client: Bank of Montreal - BMO), Viha Tech, Genxcellence Tech, Rakuten

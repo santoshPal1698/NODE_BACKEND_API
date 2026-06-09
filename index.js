@@ -36,13 +36,15 @@ app.use(express.urlencoded({ extended: false }));
 
 // ─── Security ────────────────────────────────────────────────────────────────
 app.use(helmet());
-app.use(
-  cors({
-    origin:"https://santosh-pal.netlify.app/",
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-    credentials: true,
-  })
-);
+app.use(cors());
+
+// app.use(
+//   cors({
+//     origin:"https://santosh-pal.netlify.app/",
+//     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+//     credentials: true,
+//   })
+// );
 
 // ─── Session + Passport ──────────────────────────────────────────────────────
 app.use(

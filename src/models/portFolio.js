@@ -63,6 +63,12 @@ const introSchema = new Schema({
 
 const skillSchema = new Schema({
   title: { type: String, required: true },
+  subheading: {
+    type: String,
+    default:
+      "Full Stack Developer 🌊 Skilled in Angular, React, TypeScript, and Micro Frontend Architecture | Over 5 years of hands-on experience",
+    maxlength: [200, "Subheading cannot exceed 200 characters"],
+   },
   skills: [
     {
       name: { type: String, required: true },
@@ -81,6 +87,12 @@ const experienceSchema = new Schema({
   desc: { type: String },
   skills: { type: [String] },
   doc: { type: String },
+  subheading: {
+    type: String,
+    default:
+      "Software Engineer 💻 Experienced in working with diverse companies and projects, delivering innovative solutions across Multiple Domains.",
+    maxlength: [200, "Subheading cannot exceed 200 characters"],
+  },
   ...userIdField, // ✅ Added
 });
 
@@ -92,6 +104,12 @@ const educationSchema = new Schema({
   grade: { type: String },
   desc: { type: String },
   degree: { type: String },
+  subheading: {
+    type: String,
+    default:
+      "Lifelong Learner 🎓 My education has been a journey of self-discovery and growth, shaping my technical expertise and problem-solving skills.",
+    maxlength: [200, "Subheading cannot exceed 200 characters"],
+  },
   ...userIdField, // ✅ Added
 });
 
@@ -152,6 +170,12 @@ const projectSchema = new mongoose.Schema({
   webapp: {
     type: String,
     // required: true
+  },
+  subheading: {
+    type: String,
+    default:
+      "Versatile Developer 🚀 Worked on diverse projects including LMS-MSM Unify, GCON, Naukari Job Portal, and E-commerce platforms.",
+    maxlength: [200, "Subheading cannot exceed 200 characters"],
   },
   member: [memberSchema], // Array of members
   ...userIdField, // ✅ Added

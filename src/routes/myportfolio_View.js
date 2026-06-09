@@ -22,7 +22,7 @@ const CACHE_KEYS = {
 };
 
 // Default TTL in seconds (5 minutes). Adjust as needed.
-const CACHE_TTL = 300;
+const CACHE_TTL = 5000;
 
 // ─── GET all portfolio data ─────────────────────────────────────────────────
 router.get("/get-portfolio", async (req, res) => {

@@ -27,7 +27,6 @@ const getResumeText = async () => {
     );
     const dataBuffer = fs.readFileSync(filePath);
     const data = await pdfParse(dataBuffer);
-    console.log("Text:", data.text);
   } catch (error) {
     console.error("Error reading PDF:", error);
   }

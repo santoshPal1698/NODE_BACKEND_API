@@ -4,7 +4,6 @@ const { generateFromGoogle,getSystemPrompt,getResumeText } = require("../service
 
 const chatBotController = async (req, res) => {
   const { messages } = req.body;
-  // console.log("Received messages for chatbot:", messages);
   if (!messages || !Array.isArray(messages)) {
     return res.status(400).json({ error: "messages array is required" });
   }
@@ -23,8 +22,8 @@ const chatBotController = async (req, res) => {
       },
       body: JSON.stringify({
         // system: SYSTEM_PROMPT,
-         model: "meta-llama/llama-3.1-8b-instruct:free",
-        // model: "meta-llama/llama-3-8b-instruct",
+        model: "openrouter/free",  // working
+        // model:"google/gemma-3-27b-it",
          messages: [
           {
             role: "system",
@@ -41,7 +40,6 @@ const chatBotController = async (req, res) => {
     });
 
     const data = await response.json();
-    // console.log("Raw API response for chatbot:", data);
     if (!response.ok) {
       return res.status(500).json({
         error: data?.error?.message || "API Error",
@@ -51,7 +49,6 @@ const chatBotController = async (req, res) => {
     // console.log("AI chatBoat reply for ai controllers:", reply);
     res.json({ reply });
   } catch (error) {
-    console.error("Chatbot Error:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 };

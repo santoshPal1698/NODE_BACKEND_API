@@ -23,7 +23,8 @@ const chatBotController = async (req, res) => {
       },
       body: JSON.stringify({
         // system: SYSTEM_PROMPT,
-        model: "meta-llama/llama-3-8b-instruct",
+         model: "meta-llama/llama-3.1-8b-instruct:free",
+        // model: "meta-llama/llama-3-8b-instruct",
          messages: [
           {
             role: "system",

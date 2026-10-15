@@ -1,11 +1,56 @@
 version: '3.8'
 
+networks:
+  appnet:
+    driver: bridge
+
 services:
+  # Application service: build once, scale with --scale app=N
   app:
     build: .
-    ports:
-      - "3000:3000"
+    image: mern-portfolio-api:latest
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - LIVEDB=${LIVEDB}
+      - SESSION_SECRET=${SESSION_SECRET}
+    expose:
+      - "3000"
+    depends_on:
+      - redis
+    networks:
+      - appnet
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # Redis for sessions/cache
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
     volumes:
-      - .:/usr/src/app
-      - /usr/src/app/node_modules
-    command: npm start
+      - redis-data:/data
+    networks:
+      - appnet
+
+  # NGINX reverse proxy + load balancer
+  nginx:
+    image: nginx:1.25-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/conf.d:/etc/nginx/conf.d:ro
+    depends_on:
+      - app
+    networks:
+      - appnet
+
+volumes:
+  redis-data:
+    driver: local

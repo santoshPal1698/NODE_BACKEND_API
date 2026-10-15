@@ -2,6 +2,7 @@
 const express = require("express");
 const session = require("express-session");
 const passport = require("passport");
+const mongoose = require("mongoose");
 const app = express();
 const bodyParser = require("body-parser");
 require("dotenv").config();
@@ -10,18 +11,18 @@ dotenvFlow.config();
 require("./src/db/clusterdb_server.js").connectDB();
 require("./src/Auth2Fa/Auth_Config/passportConfig.js");
 
-const cutomerRouter  = require("./src/routes/customer_view");
-const studentRouter  = require("./src/routes/student");
+const cutomerRouter = require("./src/routes/customer_view");
+const studentRouter = require("./src/routes/student");
 const portfolioRouter = require("./src/routes/myportfolio_View");
-const GenAIRouter    = require("./src/GenrativeAi-Features/Routes/ai.routes");
+const GenAIRouter = require("./src/GenrativeAi-Features/Routes/ai.routes");
 const RegisterRouter = require("./src/routes/Register");
 const EmployeeRouter = require("./src/routes/employee_view");
-const aut2FaRouter   = require("./src/Auth2Fa/Routes/auth2fa_view");
+const aut2FaRouter = require("./src/Auth2Fa/Routes/auth2fa_view");
 
-const helmet     = require("helmet");
+const helmet = require("helmet");
 const cookieParser = require("cookie-parser");
-const cors       = require("cors");
-const csrf       = require("csurf");
+const cors = require("cors");
+const csrf = require("csurf");
 
 // ─── Redis client (ioredis singleton) ───────────────────────────────────────
 const redisClient = require("./src/config/redis");
@@ -47,11 +48,26 @@ app.use(cors());
 // );
 
 // ─── Session + Passport ──────────────────────────────────────────────────────
+// When behind a reverse-proxy (NGINX) enable trust proxy so Express can
+// correctly read X-Forwarded-* headers and produce secure cookies.
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1); // trust first proxy
+}
+
+const RedisStore = require('connect-redis')(session);
+
 app.use(
   session({
+    store: new RedisStore({ client: redisClient, prefix: 'sess:' }),
     secret: process.env.SESSION_SECRET || "SptechDEVE",
     resave: false,
     saveUninitialized: false,
+    cookie: {
+      secure: process.env.NODE_ENV === 'production', // send cookie over HTTPS only in prod
+      httpOnly: true,
+      sameSite: 'lax',
+      maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
+    },
   })
 );
 app.use(passport.initialize());
@@ -126,24 +142,51 @@ app.use("/", swaggerUi.serve, swaggerUi.setup(swaggerDocument, swaggerOptions));
 // ─── Start server ────────────────────────────────────────────────────────────
 const port = process.env.PORT || 5000;
 
-app.listen(port, () => {
+const server = app.listen(port, () => {
   console.log(`✅ Server running in ${process.env.ENV} mode`);
   console.log(`🌐Api_Base URL: ${process.env.APIBASEURL} ${port}`);
   console.log(`🚀 Port: ${port}`);
 });
 
 // ─── Graceful shutdown ───────────────────────────────────────────────────────
-// Closes Redis connection cleanly when the process is stopped (Ctrl+C or PM2 reload)
+// Stop accepting requests and close external connections before PM2 restarts.
+
+let isShuttingDown = false;
 const shutdown = async (signal) => {
-  console.log(`\n${signal} received — shutting down gracefully...`);
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+
+  console.log("\n${signal} received — shutting down gracefully...");
+
   try {
-    await redisClient.quit();
+    await new Promise((resolve, reject) => {
+      server.close((error) => (error ? reject(error) : resolve()));
+    });
+  } catch (err) {
+    console.error("HTTP server shutdown error:", err.message);
+    process.exitCode = 1;
+  }
+
+  try {
+    if (redisClient.status === "ready") {
+      await redisClient.quit();
+    } else {
+      redisClient.disconnect();
+    }
     console.log("✅ Redis disconnected");
   } catch (err) {
     console.error("Redis shutdown error:", err.message);
+    process.exitCode = 1;
   }
-  process.exit(0);
+
+  try {
+    await mongoose.disconnect();
+    console.log("✅ MongoDB disconnected");
+  } catch (err) {
+    console.error("MongoDB shutdown error:", err.message);
+    process.exitCode = 1;
+  }
 };
 
-process.on("SIGINT",  () => shutdown("SIGINT"));
+process.on("SIGINT", () => shutdown("SIGINT"));
 process.on("SIGTERM", () => shutdown("SIGTERM"));

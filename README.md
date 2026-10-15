@@ -2,7 +2,115 @@ Setup MogoDB
 mogodb => "C:\Program Files\MongoDB\Server\5.0\bin/mongod.exe" --version  
 mongoEXE => "C:\Program Files\MongoDB\Server\5.0\bin/mongo.exe" --version
 
+# Run with PM2
+
+Install the project dependencies and PM2, then start the production process:
+
+```sh
+npm install
+npm install --global pm2
+npm run pm2:start
+```
+
+The PM2 configuration runs `index.js` in single-process mode. Configure the
+application's environment variables in the applicable `.env` file before
+starting it. Useful commands:
+
+```sh
+npm run pm2:status
+npm run pm2:logs
+npm run pm2:restart
+npm run pm2:stop
+```
+
+To restore the process list after a server reboot, run `pm2 startup`, follow
+the command PM2 prints, then run `pm2 save`.
+
 # Node JS + Docker Setup & Configration
+
+
+## Production: Docker Compose + NGINX load balancer (self-hosted / VPS)
+
+This repository includes an NGINX configuration and a docker-compose file that runs
+an NGINX reverse proxy in front of one or more app replicas and a Redis instance
+used for session storage.
+
+Files added/updated:
+- docker/nginx.conf — NGINX configuration that proxies to the `app` service
+- docker/conf.d/default.conf — placeholder
+- docker-compose.yml — production-ready compose (app, redis, nginx)
+- index.js — uses Redis session store and trust proxy
+
+How it works (high level):
+- NGINX receives incoming HTTP(S) requests and proxies them to the backend
+  service named `app`.
+- Run multiple `app` containers with `docker-compose up --scale app=3 -d`.
+- Docker's embedded DNS resolves the service name `app` to the IPs of all
+  running replicas; NGINX configuration uses runtime name resolution so it
+  can discover backends dynamically.
+- Sessions are stored in Redis, so any app replica can read session data.
+
+Quick start (example on a VPS):
+1) Build and start services (example using 3 app replicas):
+
+   docker-compose build
+   docker-compose up -d --scale app=3
+
+2) Verify:
+   - curl http://localhost/health
+   - docker-compose ps
+   - docker logs -f <nginx_container>
+
+Notes about scaling and DNS
+- docker-compose (non-swarm) supports runtime scaling via `--scale`.
+- NGINX by default resolves backend hostnames only at startup. The provided
+  nginx.conf uses Docker resolver (127.0.0.11) and proxy_pass via a variable
+  so nginx re-resolves names periodically (valid=10s). This gives near-real
+  time updates when replicas come and go.
+
+Security (recommended)
+- Terminate TLS at nginx (recommended). Use Certbot / Let's Encrypt on the
+  host or run an additional container for certbot to manage certificates.
+- Set NODE_ENV=production and ensure SESSION_SECRET and LIVEDB are set in the
+  host environment or a .env used by docker-compose.
+
+## Render / Managed Platform guidance
+
+If deploying to Render, Fly, Heroku, or another managed platform:
+- Do not run an in-project NGINX; use the platform's built-in load balancing
+  and scaling features.
+- Keep Redis as an external managed service (RedisCloud, Upstash, AWS Elasticache),
+  and keep sessions stored there so horizontally scaled instances share state.
+- The changes to index.js (trust proxy + Redis session store) are suitable for
+  managed platforms where the platform's load balancer or TLS terminator sits
+  in front of the app.
+
+## Important application changes made
+1) index.js
+   - app.set('trust proxy', 1) when NODE_ENV=production so Express reads
+     X-Forwarded-For and X-Forwarded-Proto from NGINX.
+   - switched express-session to use Redis (connect-redis) so sessions are
+     shared among replicas.
+   - cookies configured secure/httpOnly/sameSite in production.
+
+2) docker-compose.yml
+   - added redis and nginx services and network configuration. Use
+     `docker-compose up --scale app=3 -d` to run multiple app instances.
+
+## Notes & next steps
+- SSL/TLS: the compose file leaves TLS to you (nginx listens on 443 but
+  certificate provisioning is not included). Use Certbot on the host or add
+  a certbot container to the compose file.
+- Healthchecks: The app exposes /health — keep it lightweight (no auth).
+- Logging/Monitoring: Add a centralized log/metrics collector (Prometheus,
+  Grafana, Loki) for production observability.
+
+If you'd like, next steps I can implement for you:
+- Add a minimal Certbot + nginx-letsencrypt compose example
+- Add a simple Prometheus metrics endpoint and example scrape config
+- Add a docker-compose prod file separate from development compose
+
+
 
 1. step first for create a Dockerfile
 

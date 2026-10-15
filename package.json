@@ -7,6 +7,12 @@
     "start": "cross-env NODE_ENV=production node index.js",
     "dev": "cross-env NODE_ENV=development nodemon index.js",
     "prod": "cross-env NODE_ENV=production nodemon index.js",
+    "pm2:start": "pm2 start ecosystem.config.js --env production",
+    "pm2:restart": "pm2 restart nodejs-api",
+    "pm2:stop": "pm2 stop nodejs-api",
+    "pm2:delete": "pm2 delete nodejs-api",
+    "pm2:logs": "pm2 logs nodejs-api",
+    "pm2:status": "pm2 status",
     "graph": "nodemon server.js",
     "swager-dev": "cross-env NODE_ENV=development node swager.js",
     "swager-prod": "cross-env NODE_ENV=production node swager.js"
@@ -67,5 +73,8 @@
   "devDependencies": {
     "nodemon": "^3.1.7",
     "swagger-autogen": "^2.23.7"
+    },
+    "dependencies": {
+      "connect-redis": "^6.0.0"
+    }
   }
-}

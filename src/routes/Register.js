@@ -67,8 +67,7 @@ router.post("/register", async (req, res) => {
     // console.log("Register data ", savedb);
     const apiBaseUrl = `${process.env.APIBASEURL}api/v1/email-verify/${userRegistion._id}`;
     await emailSendUser(
-      userRegistion.email,"Verify your email",apiBaseUrl,"verifyEmail",
-      {
+      userRegistion.email,"Verify your email",apiBaseUrl,"verifyEmail",{
         name: req.body.firstName + req.body.lastName,
         apiBaseUrl: apiBaseUrl,
         logoUrl: process.env.COMPANY_LOGO_URL,
@@ -127,7 +126,6 @@ router.post("/login", async (req, res) => {
       email: user.email,
       gender: user.gender,
       phone_Number: user.phone_Number,
-      password: password,
       isVerified: user.isVerified,
       roles: user.roles
     };
@@ -151,6 +149,7 @@ router.post("/login", async (req, res) => {
     });
   }
 });
+
 
 
 // router.get("/user-profile" ,async (req, res) => {

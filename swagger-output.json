@@ -5,10 +5,10 @@
     "description": "Node.js API provides a secure authentication and authorization system, featuring user signup, login, and email verification. It supports role-based access control (RBAC) to manage user roles, ensuring granular permission management. The API leverages Bearer token authentication for secure session handling and token-based authorization, ensuring only verified users can access protected resources. Designed for scalability, it offers robust security, including JWT token issuance and validation.",
     "version": "1.0.0"
   },
-  "host": "sptech-api-v1.onrender.com/api/v1",
+  "host": "localhost:8000/api/v1",
   "basePath": "/",
   "schemes": [
-    "https"
+    "http"
   ],
   "paths": {
     "/register": {

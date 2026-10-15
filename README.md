@@ -73,6 +73,11 @@ Security (recommended)
   host or run an additional container for certbot to manage certificates.
 - Set NODE_ENV=production and ensure SESSION_SECRET and LIVEDB are set in the
   host environment or a .env used by docker-compose.
+- Configure REDIS_URL with the current Redis endpoint (redis:// or rediss://),
+  or use REDIS_HOST/REDIS_PORT for a local Redis server. Redis is required for
+  session storage; startup waits for Redis retries and fails with a clear error
+  if the endpoint cannot be reached. For ENOTFOUND, verify the hostname in the
+  Redis provider dashboard and update the environment variable.
 
 ## Render / Managed Platform guidance
 

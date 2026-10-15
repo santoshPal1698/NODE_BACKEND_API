@@ -2,7 +2,6 @@
 const express = require("express");
 const session = require("express-session");
 const passport = require("passport");
-const mongoose = require("mongoose");
 const app = express();
 const bodyParser = require("body-parser");
 require("dotenv").config();
@@ -11,18 +10,18 @@ dotenvFlow.config();
 require("./src/db/clusterdb_server.js").connectDB();
 require("./src/Auth2Fa/Auth_Config/passportConfig.js");
 
-const cutomerRouter = require("./src/routes/customer_view");
-const studentRouter = require("./src/routes/student");
+const cutomerRouter  = require("./src/routes/customer_view");
+const studentRouter  = require("./src/routes/student");
 const portfolioRouter = require("./src/routes/myportfolio_View");
-const GenAIRouter = require("./src/GenrativeAi-Features/Routes/ai.routes");
+const GenAIRouter    = require("./src/GenrativeAi-Features/Routes/ai.routes");
 const RegisterRouter = require("./src/routes/Register");
 const EmployeeRouter = require("./src/routes/employee_view");
-const aut2FaRouter = require("./src/Auth2Fa/Routes/auth2fa_view");
+const aut2FaRouter   = require("./src/Auth2Fa/Routes/auth2fa_view");
 
-const helmet = require("helmet");
+const helmet     = require("helmet");
 const cookieParser = require("cookie-parser");
-const cors = require("cors");
-const csrf = require("csurf");
+const cors       = require("cors");
+const csrf       = require("csurf");
 
 // ─── Redis client (ioredis singleton) ───────────────────────────────────────
 const redisClient = require("./src/config/redis");
@@ -39,42 +38,26 @@ app.use(express.urlencoded({ extended: false }));
 app.use(helmet());
 app.use(cors());
 
-// app.use(
-//   cors({
-//     origin:"https://santosh-pal.netlify.app/",
-//     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-//     credentials: true,
-//   })
-// );
-
-// ─── Session + Passport ──────────────────────────────────────────────────────
-// When behind a reverse-proxy (NGINX) enable trust proxy so Express can
-// correctly read X-Forwarded-* headers and produce secure cookies.
-if (process.env.NODE_ENV === 'production') {
-  app.set('trust proxy', 1); // trust first proxy
-}
-
-const RedisStore = require('connect-redis')(session);
 
 app.use(
+  cors({
+    origin: (process.env.FRONT_END_PRODURL || "http://localhost:3000").split(",").map((origin) => origin.trim()),
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  })
+);
+
+// ─── Session + Passport ──────────────────────────────────────────────────────
+app.use(
   session({
-    store: new RedisStore({ client: redisClient, prefix: 'sess:' }),
     secret: process.env.SESSION_SECRET || "SptechDEVE",
     resave: false,
     saveUninitialized: false,
-    cookie: {
-      secure: process.env.NODE_ENV === 'production', // send cookie over HTTPS only in prod
-      httpOnly: true,
-      sameSite: 'lax',
-      maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
-    },
   })
 );
 app.use(passport.initialize());
 app.use(passport.session());
 
-// ─── CSRF ────────────────────────────────────────────────────────────────────
-const csrfProtection = csrf();
 
 // ─── Swagger ─────────────────────────────────────────────────────────────────
 const swaggerUi = require("swagger-ui-express");
@@ -102,7 +85,6 @@ app.get("/health", async (req, res) => {
 // Hit DELETE /cache/portfolio to manually flush portfolio cache keys
 app.delete("/cache/portfolio", async (req, res) => {
   try {
-    // Find all keys matching portfolio:* pattern and delete them
     const keys = await redisClient.keys("portfolio:*");
     if (keys.length > 0) {
       await redisClient.del(...keys);
@@ -118,23 +100,10 @@ app.delete("/cache/portfolio", async (req, res) => {
 });
 
 app.get("/api/v1/rate-limit-status", getRateLimitStatus);
-// WHY NOT apply to /health, /cache/portfolio, swagger:
-//  - /health: monitoring tools ping this every 30s — would hit limit instantly
-//  - /cache/portfolio: admin tool — should always work
-//  - swagger: documentation page — not an API call
 app.use("/api/v1", rateLimiter);
 
 // ─── App routes ──────────────────────────────────────────────────────────────
-app.use(
-  "/api/v1",
-  RegisterRouter,
-  aut2FaRouter,
-  portfolioRouter,
-  GenAIRouter,
-  cutomerRouter,
-  EmployeeRouter,
-  studentRouter
-);
+app.use("/api/v1",RegisterRouter,aut2FaRouter,portfolioRouter,GenAIRouter,cutomerRouter,EmployeeRouter,studentRouter);
 
 // ─── Swagger UI ──────────────────────────────────────────────────────────────
 app.use("/", swaggerUi.serve, swaggerUi.setup(swaggerDocument, swaggerOptions));
@@ -142,51 +111,24 @@ app.use("/", swaggerUi.serve, swaggerUi.setup(swaggerDocument, swaggerOptions));
 // ─── Start server ────────────────────────────────────────────────────────────
 const port = process.env.PORT || 5000;
 
-const server = app.listen(port, () => {
+app.listen(port, () => {
   console.log(`✅ Server running in ${process.env.ENV} mode`);
   console.log(`🌐Api_Base URL: ${process.env.APIBASEURL} ${port}`);
   console.log(`🚀 Port: ${port}`);
 });
 
 // ─── Graceful shutdown ───────────────────────────────────────────────────────
-// Stop accepting requests and close external connections before PM2 restarts.
-
-let isShuttingDown = false;
+// Closes Redis connection cleanly when the process is stopped (Ctrl+C or PM2 reload)
 const shutdown = async (signal) => {
-  if (isShuttingDown) return;
-  isShuttingDown = true;
-
-  console.log("\n${signal} received — shutting down gracefully...");
-
+  console.log(`\n${signal} received — shutting down gracefully...`);
   try {
-    await new Promise((resolve, reject) => {
-      server.close((error) => (error ? reject(error) : resolve()));
-    });
-  } catch (err) {
-    console.error("HTTP server shutdown error:", err.message);
-    process.exitCode = 1;
-  }
-
-  try {
-    if (redisClient.status === "ready") {
-      await redisClient.quit();
-    } else {
-      redisClient.disconnect();
-    }
+    await redisClient.quit();
     console.log("✅ Redis disconnected");
   } catch (err) {
     console.error("Redis shutdown error:", err.message);
-    process.exitCode = 1;
   }
-
-  try {
-    await mongoose.disconnect();
-    console.log("✅ MongoDB disconnected");
-  } catch (err) {
-    console.error("MongoDB shutdown error:", err.message);
-    process.exitCode = 1;
-  }
+  process.exit(0);
 };
 
-process.on("SIGINT", () => shutdown("SIGINT"));
+process.on("SIGINT",  () => shutdown("SIGINT"));
 process.on("SIGTERM", () => shutdown("SIGTERM"));

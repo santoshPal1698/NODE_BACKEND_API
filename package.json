@@ -30,6 +30,7 @@
     "body-parser": "^1.20.3",
     "cloudinary": "^2.9.0",
     "connect-ensure-login": "^0.1.1",
+    "connect-redis": "^8.1.0",
     "cookie-parser": "^1.4.7",
     "cookies": "^0.9.1",
     "cors": "^2.8.5",
@@ -73,8 +74,5 @@
   "devDependencies": {
     "nodemon": "^3.1.7",
     "swagger-autogen": "^2.23.7"
-    },
-    "dependencies": {
-      "connect-redis": "^6.0.0"
-    }
   }
+}
